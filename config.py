@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # Default user identifier
     DEFAULT_USER_ID: str = "default_user"
 
+    # URL of the running MCP server (HTTP/SSE transport).
+    # For local development, start the server with an SSE-capable runner and set this.
+    MCP_SERVER_URL: str = "http://localhost:8000/sse"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
