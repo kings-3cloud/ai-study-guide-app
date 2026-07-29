@@ -1,8 +1,6 @@
 # Implementation Phases & GitHub Copilot Prompts
 Each prompt below is self-contained — paste it directly into GitHub Copilot Agent mode.
-```
 
-```
 ## Phase 1 — Project Setup
 
 ### Prompt 1 — Scaffold project structure + requirements
@@ -166,36 +164,135 @@ In main.py, implement the main multi-turn conversation loop:
 - Gracefully shut down the MCP server subprocess on exit
 Use azure-ai-projects SDK patterns throughout. Add clear console output showing which agent is responding.
 ```
-## Phase 5 — Verification
 
-### Prompt 13 — Integration test script
+Prompt 13 — FastAPI route: chat
 ```
-Create a file tests/test_integration.py that runs an end-to-end smoke test:
-1. Starts the MCP server subprocess
-2. Tests fetch_url_content with https://en.wikipedia.org/wiki/Machine_learning
-3. Tests generate_quiz with a sample content string (5 questions)
-4. Tests save_progress with a dummy user_id "test_user" and sample quiz result data
-5. Tests get_progress for "test_user" and asserts the saved entry appears
-6. Prints PASS/FAIL for each test
-Do not use any testing frameworks — plain Python with assert statements.
+In backend/api/routes/chat.py, implement two FastAPI routes:
+
+1. POST /api/thread
+   - Accepts CreateThreadRequest
+   - Creates a new thread via project_client.agents.create_thread()
+   - Returns CreateThreadResponse with the thread_id
+
+2. POST /api/chat
+   - Accepts ChatRequest (thread_id, message, user_id)
+   - Creates a user message in the thread via project_client.agents.create_message()
+   - Creates and polls a run against the orchestrator agent until status is "completed" or "failed"
+   - Retrieves the latest assistant message from the thread
+   - Returns ChatResponse with the assistant's text response
+   - Return HTTP 500 with detail on run failure
+
+Use APIRouter with prefix="/api". The project_client and orchestrator_agent_id should come from app.state (set during startup). Import models from backend/api/models.py.
+```
+
+Prompt 14 — FastAPI routes: progress + file upload
+```
+In backend/api/routes/progress.py, implement:
+- GET /api/progress/{user_id}
+  - Reads backend/data/progress/{user_id}.json directly (no agent call needed)
+  - Returns ProgressResponse with the parsed history list
+  - Returns 404 if file not found
+
+In backend/api/routes/files.py, implement:
+- POST /api/upload-pdf
+  - Accepts a multipart file upload (UploadFile)
+  - Validates it is a .pdf file (check filename extension)
+  - Saves it to backend/data/uploads/{filename} (create dir if needed)
+  - Returns UploadResponse with the saved file_path
+  - Reject non-PDF files with HTTP 400
+
+Use APIRouter with prefix="/api" in both files.
+```
+
+Prompt 15 — FastAPI main app (replaces old CLI main.py)
+```
+In backend/main.py, create the FastAPI application:
+- On startup (lifespan):
+  1. Load config from config.py
+  2. Start mcp_server/server.py as a subprocess (store in app.state.mcp_proc)
+  3. Authenticate with DefaultAzureCredential and create AIProjectClient
+  4. Call all four create_or_get_* agent functions; store agent IDs in app.state
+  5. Store project_client in app.state
+- On shutdown: terminate the MCP server subprocess gracefully
+- Register routers from api/routes/chat.py, api/routes/progress.py, api/routes/files.py
+- Mount the frontend/ folder as StaticFiles at path "/" with html=True so index.html is served at the root
+- Add CORS middleware allowing localhost origins (for local dev)
+- Add a GET /api/health endpoint returning {"status": "ok"}
+
+Entry point: run with `uvicorn backend.main:app --reload` from the project root.
+```
+
+## Phase 5 — Frontend
+
+### Prompt 16 — Frontend HTML pages + CSS
+```
+In frontend/index.html, create a clean chat UI page:
+- A header with the app name "Study Assistant"
+- A nav link to progress.html ("My Progress")
+- A message thread display area (scrollable div, id="chat-box")
+- A text input + send button for user messages
+- A "New Chat" button that calls POST /api/thread
+- A file upload button for PDFs that calls POST /api/upload-pdf and displays the returned file_path in the input
+- On page load, auto-create a thread (call POST /api/thread) and store thread_id in sessionStorage
+
+In frontend/progress.html, create a progress dashboard:
+- A header with back link to index.html
+- A div to display: total topics studied, average quiz score, best/worst topic, and a list of recent activities
+- On load, call GET /api/progress/default_user and render the results
+
+In frontend/css/style.css, add clean minimal styling:
+- CSS variables for colors (dark background for chat, light bubbles for user, accent color for buttons)
+- User messages right-aligned, assistant messages left-aligned
+- Responsive layout, max-width 800px centered
+```
+
+### Prompt 17 — Frontend JavaScript
+```
+In frontend/js/app.js, implement the chat page logic:
+- On DOMContentLoaded: if no thread_id in sessionStorage, call POST /api/thread and store the returned thread_id
+- Send button / Enter key: read the input, POST to /api/chat with { thread_id, message, user_id: "default_user" }
+- Show a loading indicator while waiting for the response
+- Append both the user message and the agent response to the chat-box div as styled bubbles
+- File upload button: POST the file to /api/upload-pdf, then insert "Study this PDF: {file_path}" into the text input
+- New Chat button: call POST /api/thread, update sessionStorage, clear the chat-box
+- Use native fetch() only — no libraries
+
+In frontend/js/progress.js, implement the progress page logic:
+- On DOMContentLoaded: fetch GET /api/progress/default_user
+- Parse the response and render: topic count, average score, recent activity list (timestamp + activity type + summary)
+- If no progress found, show a friendly empty state message
+```
+
+
+## Phase 6 — Verification
+
+### Prompt 18 — Integration test script
+```
+Create tests/test_integration.py that runs a smoke test against the MCP tools directly (without starting FastAPI):
+1. Import and call fetch_url.fetch_url_content("https://en.wikipedia.org/wiki/Machine_learning") — assert returns non-empty string
+2. Call quiz_tools.generate_quiz("Machine learning is a subset of AI...", 3, ["multiple_choice"]) — assert returns valid JSON with quiz_id
+3. Call progress_tools.save_progress("test_user", "quiz_taken", {"score": 80, "topic": "ML"}) — assert confirmation string returned
+4. Call progress_tools.get_progress("test_user") — assert the saved entry is in the returned JSON
+5. Print PASS/FAIL for each step
+Do not use pytest — plain Python with assert statements and try/except.
 ```
 
 > ### Verification Checklist
-1. Run python mcp_server/server.py — server starts without errors
-1. Run python tests/test_integration.py — all 4 tool tests pass
-1. Set PROJECT_CONNECTION_STRING in .env and run python main.py — agents provision in Azure AI Foundry portal
-1. In Azure AI Foundry portal, confirm all 4 agents appear under your project
-1. In the conversation loop: paste a Wikipedia URL → confirm summary response
-1. Ask "quiz me on what I just read" → confirm 5 questions generated
-1. Ask "show my progress" → confirm activity was saved and reported
+1. `cd project root` → `uvicorn backend.main:app` --reload starts without errors
+1. Navigate to `http://localhost:8000` → frontend/index.html loads
+1. `GET http://localhost:8000/api/health` → `{"status": "ok"}`
+1. Send a Wikipedia URL in the chat → content summary returned
+1. Type "quiz me" → 5 questions returned
+1. Navigate to `http://localhost:8000/progress.html` → progress loads
+1. Check Azure AI Foundry portal → all 4 agents appear under the project
 
 
 > ### Decisions & Scope
-- Agents live in Azure AI Foundry; the MCP server runs locally (or can be deployed later)
-- Connected agents pattern used for orchestrator → specialist routing (not Semantic Kernel)
-- No web UI — CLI conversation loop only in this plan
-- User identity defaults to "default_user" configurable via .env
-- PyPDF2 for PDF extraction (can be swapped for pdfplumber for better accuracy later)
+- FastAPI serves both API and frontend static files from one process — no separate frontend dev server
+- CLI loop removed; FastAPI is the sole entry point
+- Thread IDs stored in browser `sessionStorage` — one session per browser tab
+- PDF uploads saved to `backend/data/uploads/` (not cleaned up — add cleanup later if needed)
+- All original agent definitions, models, and MCP tools are unchanged
 
 
 > ### Further Considerations
@@ -203,24 +300,3 @@ Do not use any testing frameworks — plain Python with assert statements.
 1. Agent Persistence: The "create-or-retrieve" pattern avoids duplicate agent provisioning on every run — important since Azure AI Foundry has per-agent billing and quotas.
 1. Authentication: DefaultAzureCredential covers local dev (Azure CLI login) and production (Managed Identity) without code changes.
 
-
-> I'm building a Personal Study Assistant multi-agent app in Python using Azure AI Agent Service (azure-ai-projects SDK) and a custom MCP server. The project root is the current workspace.
-```
-Create the following folder and file structure (empty files are fine):
-
-agents/orchestrator.py
-agents/content_agent.py
-agents/quiz_agent.py
-agents/progress_agent.py
-mcp_server/server.py
-mcp_server/tools/fetch_url.py
-mcp_server/tools/fetch_pdf.py
-mcp_server/tools/quiz_tools.py
-mcp_server/tools/progress_tools.py
-data/progress/.gitkeep
-main.py
-config.py
-.env.example
-Then create requirements.txt with these dependencies:
-azure-ai-projects, azure-ai-agents, azure-identity, httpx, PyPDF2, mcp, python-dotenv, pydantic
-```
