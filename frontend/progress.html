@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Progress — Study Assistant</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="index.html" class="back-link" aria-label="Back to chat">← Back to Chat</a>
+      <h1>My Progress</h1>
+      <span></span><!-- spacer to keep h1 centred -->
+    </div>
+  </header>
+
+  <main class="progress-layout">
+    <section class="stats-grid" aria-label="Study statistics">
+      <div class="stat-card">
+        <span class="stat-value" id="topics-count">—</span>
+        <span class="stat-label">Topics Studied</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="avg-score">—</span>
+        <span class="stat-label">Avg Quiz Score</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="best-topic">—</span>
+        <span class="stat-label">Best Topic</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="worst-topic">—</span>
+        <span class="stat-label">Needs Review</span>
+      </div>
+    </section>
+
+    <section class="activity-section">
+      <h2>Recent Activity</h2>
+      <ul id="activity-list" class="activity-list" aria-label="Activity history"></ul>
+      <p id="empty-state" class="empty-state hidden">
+        No study activity yet — head back to the chat and share a URL or PDF to get started!
+      </p>
+    </section>
+  </main>
+
+  <script src="js/progress.js"></script>
+</body>
+</html>
