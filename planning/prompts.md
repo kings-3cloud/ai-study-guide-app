@@ -165,7 +165,7 @@ In main.py, implement the main multi-turn conversation loop:
 Use azure-ai-projects SDK patterns throughout. Add clear console output showing which agent is responding.
 ```
 
-Prompt 13 — FastAPI route: chat
+### Prompt 13 — FastAPI route: chat
 ```
 In backend/api/routes/chat.py, implement two FastAPI routes:
 
@@ -185,7 +185,7 @@ In backend/api/routes/chat.py, implement two FastAPI routes:
 Use APIRouter with prefix="/api". The project_client and orchestrator_agent_id should come from app.state (set during startup). Import models from backend/api/models.py.
 ```
 
-Prompt 14 — FastAPI routes: progress + file upload
+### Prompt 14 — FastAPI routes: progress + file upload
 ```
 In backend/api/routes/progress.py, implement:
 - GET /api/progress/{user_id}
@@ -204,7 +204,7 @@ In backend/api/routes/files.py, implement:
 Use APIRouter with prefix="/api" in both files.
 ```
 
-Prompt 15 — FastAPI main app (replaces old CLI main.py)
+### Prompt 15 — FastAPI main app (replaces old CLI main.py)
 ```
 In backend/main.py, create the FastAPI application:
 - On startup (lifespan):
