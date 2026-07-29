@@ -34,29 +34,30 @@ class _TextExtractor(HTMLParser):
         return " ".join(self._parts)
 
 
+def fetch_url_content(url: str) -> str:
+    """Fetch a web page and return its plain-text content (max 8 000 chars)."""
+    try:
+        with httpx.Client(timeout=10.0, follow_redirects=True) as client:
+            response = client.get(url)
+            response.raise_for_status()
+            html = response.text
+    except httpx.TimeoutException:
+        return f"Error: request to {url!r} timed out after 10 seconds."
+    except httpx.HTTPStatusError as exc:
+        return f"Error: HTTP {exc.response.status_code} from {url!r}."
+    except httpx.RequestError as exc:
+        return f"Error: could not reach {url!r}: {exc}"
+
+    parser = _TextExtractor()
+    parser.feed(html)
+    text = parser.get_text()
+
+    if len(text) > _MAX_CHARS:
+        text = text[:_MAX_CHARS] + "… [truncated]"
+
+    return text
+
+
 def register_tools(mcp: FastMCP) -> None:
     """Register fetch_url tools with the MCP server."""
-
-    @mcp.tool()
-    def fetch_url_content(url: str) -> str:
-        """Fetch a web page and return its plain-text content (max 8 000 chars)."""
-        try:
-            with httpx.Client(timeout=10.0, follow_redirects=True) as client:
-                response = client.get(url)
-                response.raise_for_status()
-                html = response.text
-        except httpx.TimeoutException:
-            return f"Error: request to {url!r} timed out after 10 seconds."
-        except httpx.HTTPStatusError as exc:
-            return f"Error: HTTP {exc.response.status_code} from {url!r}."
-        except httpx.RequestError as exc:
-            return f"Error: could not reach {url!r}: {exc}"
-
-        parser = _TextExtractor()
-        parser.feed(html)
-        text = parser.get_text()
-
-        if len(text) > _MAX_CHARS:
-            text = text[:_MAX_CHARS] + "… [truncated]"
-
-        return text
+    mcp.tool()(fetch_url_content)
