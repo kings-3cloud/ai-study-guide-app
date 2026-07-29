@@ -1,0 +1,8 @@
+azure-ai-projects
+azure-ai-agents
+azure-identity
+httpx
+PyPDF2
+mcp
+python-dotenv
+pydantic
